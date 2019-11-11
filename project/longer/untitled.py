@@ -8,22 +8,42 @@
 
 import psutil
 import os
+import stat
 import sip
 from functools import partial
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import *
+from longer.QDoublePushButton import QDoublePushButton
+from longer.fileSearchThread import fileSearchThread
 
 class Ui_MainWindow(object):
     # upload  download  share delete  newfile  searchfile selectfile  refresh back  forward
     # 点击树菜单触发
     def treeclick(self, index):
+        self.pushButton_7.setEnabled(False)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("../ioc/rightnot.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.pushButton_7.setIcon(icon)
+
+        self.pushButton_8.setEnabled(False)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("../ioc/leftnot.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.pushButton_8.setIcon(icon)
+
+        self.nextPath=""
+
         _translate = QtCore.QCoreApplication.translate
         item = self.treeWidget.currentItem()
         i = '{0}{1}'.format(item.text(0)[0:1], ':')
-        self.label_2.setText(_translate("MainWindow", i))
         if '盘' in item.text(0):
+            self.label_2.setText(_translate("MainWindow", i))
             self.getFile( os.listdir(i))
-
+        else:
+            self.label_2.setText(_translate("MainWindow", item.text(0)))
+     #滚动置顶
+    def goTop(self):
+        self.scrollBar = self.scrollArea.verticalScrollBar()
+        self.scrollBar.setValue(0)
     def upload(self,index):
         print("上传被点击")
     def download(self,index):
@@ -38,30 +58,113 @@ class Ui_MainWindow(object):
         print("选中被点击")
     def searchfile(self,index):
         print("查询被点击")
+        Ui_MainWindow.result=[]
+        self.ButtonClicked(self.lineEdit.text())
+        print("搜索结果",self.result)
+
+    #搜索
+    def ButtonClicked(self,text):
+        # 创建新线程，将自定义信号sinOut连接到slotAdd()槽函数
+        keyword = text
+        self.result=[]
+        self.thread=fileSearchThread(keyword)
+        self.thread.sinOut.connect(self.slotAdd)
+
+        self.thread.start()
+
+    #搜索用的
+    def slotAdd(self,filename):
+        self.result.append(str(filename))
+        self.getFile(self.result)
     def refresh(self,index):
+        self.goTop()
+        text = self.label_2.text()
+        try:
+            self.getFile(os.listdir(text))
+        except PermissionError as e:  # 发生异常执行这块代码
+            self.label_2.setText(_translate("MainWindow", text))
+            QMessageBox.warning(self.centralwidget, "错误提示", "系统拒绝访问！", QMessageBox.Yes)
         print("刷新被点击")
+
     def back(self,index):
-        print("后退被点击")
+        _translate = QtCore.QCoreApplication.translate
+        text = self.label_2.text()
+        # 为返回做准备
+        self.nextPath = text
+        self.pushButton_7.setEnabled(True)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("../ioc/rightcan.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.pushButton_7.setIcon(icon)
+        #返回结束
+        i=self.Index(text,'/')
+        self.label_2.setText(_translate("MainWindow", text[0:i]))
+        try:
+            self.getFile(os.listdir(text[0:i]))
+        except PermissionError as e:  # 发生异常执行这块代码
+            self.label_2.setText(_translate("MainWindow", text))
+            QMessageBox.warning(self.centralwidget, "错误提示", "系统拒绝访问！", QMessageBox.Yes)
+        if not '/' in text[0:i]:
+            self.pushButton_8.setEnabled(False)
+            icon1 = QtGui.QIcon()
+            icon1.addPixmap(QtGui.QPixmap("../ioc/leftnot.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            self.pushButton_8.setIcon(icon1)
+
+
     def forward(self,index):
+        #下一步设计
+        _translate = QtCore.QCoreApplication.translate
+        self.label_2.setText(_translate("MainWindow", self.nextPath))
+        try:
+            self.getFile(os.listdir(self.nextPath))
+        except PermissionError as e:  # 发生异常执行这块代码
+            self.label_2.setText(_translate("MainWindow", text))
+            QMessageBox.warning(self.centralwidget, "错误提示", "系统拒绝访问！", QMessageBox.Yes)
+        self.label_2.setText(_translate("MainWindow", self.nextPath))
+        self.nextPath = ''
+        self.pushButton_7.setEnabled(False)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("../ioc/rightnot.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.pushButton_7.setIcon(icon)
+        #放回按钮的可点击
+        self.pushButton_8.setEnabled(True)
+        icon1 = QtGui.QIcon()
+        icon1.addPixmap(QtGui.QPixmap("../ioc/leftcan.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.pushButton_8.setIcon(icon1)
         print("前进被点击")
-    def stopTimer(self):
-        self.timer.stop()
-        print(self.titile)
-    # def doDoubleClick(self,index,value):
-    #     #print("双击事件触发")
+    #查找角标最后一次出现的位置
+    def Index(self,str1, c):
+        icount = 0
+        for index, ch in enumerate(str1):
+            if ch == c:
+                icount =index
+        return icount
+    def doDoubleClick(self,index,value):
+        #后退按钮为true,可点击
+        self.pushButton_8.setEnabled(True)
+        icon= QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("../ioc/leftcan.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.pushButton_8.setIcon(icon)
+        _translate = QtCore.QCoreApplication.translate
+        text = self.label_2.text()
+        item = self.treeWidget.currentItem()
+        i = '{0}{1}{2}'.format(text, '/', value)
+        if os.path.isdir(i):
+            self.label_2.setText(_translate("MainWindow", i))
+            try:
+                self.getFile(os.listdir(i))
+            except PermissionError as e:  #发生异常执行这块代码
+                self.label_2.setText(_translate("MainWindow", text))
+                QMessageBox.warning(self.centralwidget,"错误提示","系统拒绝访问！",QMessageBox.Yes)
+
     def remember(self,index,value):
-        if not self.timer.isActive():
-            self.timer.timeout.connect(self.stopTimer)
-            self.timer.start(400)
-            # _translate = QtCore.QCoreApplication.translate
-            # text = self.label_2.text()
-            # item = self.treeWidget.currentItem()
-            # i = '{0}{1}{2}'.format(text, '/', value)
-            # self.label_2.setText(_translate("MainWindow", i))
-            # #print(index, value)
-            self.titile='单击事件'
-        else:
-            self.titile='双击事件'
+        _translate = QtCore.QCoreApplication.translate
+        text = self.label_2.text()
+        item = self.treeWidget.currentItem()
+        i = '{0}{1}{2}'.format(text, '/', value)
+        name='{0}{1}'.format('pushButton_file',index)
+        getattr(self, name).setStyleSheet("background-color: rgb(255, 255, 255);")
+
+
     def getFile(self,testList):
         marginLeft = 0
         marginRight = 0
@@ -73,7 +176,6 @@ class Ui_MainWindow(object):
             if not attr.startswith('__') and 'frame_file' in attr:
                 for i in range(self.gridLayout.count()):
                     self.gridLayout.itemAt(i).widget().deleteLater()
-
         for index, value in enumerate(testList):
             if index == 0 and marginLeft==0 and marginRight==0:
                 marginRight = 0
@@ -99,7 +201,6 @@ class Ui_MainWindow(object):
             getattr(self, name).setFrameShadow(QtWidgets.QFrame.Raised)
             getattr(self, name).setObjectName(name)
 
-
             setattr(self, layoutWidget, QtWidgets.QWidget(getattr(self, name)))
             getattr(self, layoutWidget).setGeometry(QtCore.QRect(20, 10, 78, 92))
             getattr(self, layoutWidget).setObjectName(layoutWidget)
@@ -108,18 +209,37 @@ class Ui_MainWindow(object):
             getattr(self, verticalLayout).setContentsMargins(0, 0, 0, 0)
             getattr(self, verticalLayout).setObjectName(verticalLayout)
 
-            setattr(self, pushButton, QtWidgets.QPushButton(getattr(self, layoutWidget)))
+            setattr(self, pushButton, QDoublePushButton("aaaa",getattr(self, layoutWidget)))
             getattr(self, pushButton).setLayoutDirection(QtCore.Qt.LeftToRight)
             getattr(self, pushButton).setStyleSheet("border:none;")
             getattr(self, pushButton).setText("")
             icon11 = QtGui.QIcon()
-            icon11.addPixmap(QtGui.QPixmap("../ioc/文件夹.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            if not '.' in value:
+               icon11.addPixmap(QtGui.QPixmap("../ioc/文件夹.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            #BMP、JPG、JPEG、PNG、GIF,ico
+            elif '.png' in value  or  '.bmp' in value  or'.gif' in value or '.ico'  in value or '.jpg' in value or '.jpge' in value:
+               icon11.addPixmap(QtGui.QPixmap("../ioc/img.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            #音频.mp3.wma
+            elif '.mp3' in value or '.wma' in value:
+                icon11.addPixmap(QtGui.QPixmap("../ioc/music.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            # .doc”和“.docx
+            elif '.docx' in value or '.doc' in value:
+                 icon11.addPixmap(QtGui.QPixmap("../ioc/word.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            # 程序
+            elif '.exe' in value or '.sys' in value or '.com' in value:
+                 icon11.addPixmap(QtGui.QPixmap("../ioc/应用.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            #视频avi,mpg,mpeg,rm,rmvb,dat（VCD中使用）,wmv,mov
+            elif '.avi' in value or '.mpg' in value or '.mpeg' in value or '.rm' in value or '.rmvb' in value or '.dat' in value or '.wmv' in value or '.mov' in value or '.mp4' in value:
+                icon11.addPixmap(QtGui.QPixmap("../ioc/img.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+            else:
+                icon11.addPixmap(QtGui.QPixmap("../ioc/other.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
             getattr(self, pushButton).setIcon(icon11)
             getattr(self, pushButton).setIconSize(QtCore.QSize(64, 64))
             getattr(self, pushButton).setObjectName(pushButton)
             getattr(self, pushButton).setCheckable(True)
             # 给绑定事件 partial(self.remember)
             getattr(self, pushButton).clicked.connect(partial(self.remember,index,value))
+            getattr(self, pushButton).doubleClicked.connect(partial(self.doDoubleClick,index,value))
             getattr(self, pushButton)
 
             getattr(self, verticalLayout).addWidget( getattr(self, pushButton))
@@ -134,7 +254,13 @@ class Ui_MainWindow(object):
             if index == len(testList) - 1 and index < 6:
                 self.gridLayoutWidget.setGeometry(QtCore.QRect(10, 0, 78*(index+1+1), layoutWidgetHeight))
             else:
-                self.gridLayoutWidget.setGeometry(QtCore.QRect(10, 0, 721, layoutWidgetHeight))
+                if layoutWidgetHeight>2000:
+                    self.scrollAreaWidgetContents.setMinimumSize(250, layoutWidgetHeight+1000)
+                    self.gridLayoutWidget.setGeometry(QtCore.QRect(0, 0, 721, layoutWidgetHeight+1000))
+                else:
+                    self.gridLayoutWidget.setGeometry(QtCore.QRect(0, 0, 721, layoutWidgetHeight))
+            self.goTop()
+
 
     def setupUi(self, MainWindow):
         #数据模型
@@ -147,13 +273,15 @@ class Ui_MainWindow(object):
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.frame = QtWidgets.QFrame(self.centralwidget)
-        self.frame.setGeometry(QtCore.QRect(10, 10, 161, 531))
+        self.frame.setGeometry(QtCore.QRect(10,40, 161, 531))
         self.frame.setAutoFillBackground(True)
         self.frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame.setObjectName("frame")
         self.treeWidget = QtWidgets.QTreeWidget(self.frame)
-        self.treeWidget.setGeometry(QtCore.QRect(10, 0, 151, 481))
+        self.treeWidget.setGeometry(QtCore.QRect(10, 0, 151, 461))
+        _translate = QtCore.QCoreApplication.translate
+        self.treeWidget.headerItem().setText(0, _translate("MainWindow", ""))
         # 给树绑定事件
         self.treeWidget.clicked.connect(self.treeclick)
         self.treeWidget.setObjectName("treeWidget")
@@ -177,8 +305,9 @@ class Ui_MainWindow(object):
         icon2 = QtGui.QIcon()
         icon2.addPixmap(QtGui.QPixmap("../ioc/删除.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         item_0.setIcon(0, icon2)
+        self.treeWidget.expandAll()
         self.progressBar = QtWidgets.QProgressBar(self.frame)
-        self.progressBar.setGeometry(QtCore.QRect(10, 493, 151, 16))
+        self.progressBar.setGeometry(QtCore.QRect(10, 483, 151, 16))
         self.progressBar.setProperty("value", 24)
         self.progressBar.setObjectName("progressBar")
         self.frame_2 = QtWidgets.QFrame(self.centralwidget)
@@ -237,16 +366,20 @@ class Ui_MainWindow(object):
         self.pushButton_8 = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
         self.pushButton_8.setText("")
         icon7 = QtGui.QIcon()
-        icon7.addPixmap(QtGui.QPixmap("../ioc/left.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon7.addPixmap(QtGui.QPixmap("../ioc/leftnot.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.pushButton_8.setIcon(icon7)
         self.pushButton_8.setObjectName("pushButton_8")
         self.horizontalLayout_2.addWidget(self.pushButton_8)
         self.pushButton_7 = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
         self.pushButton_7.setText("")
         icon8 = QtGui.QIcon()
-        icon8.addPixmap(QtGui.QPixmap("../ioc/right.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon8.addPixmap(QtGui.QPixmap("../ioc/rightnot.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.pushButton_7.setIcon(icon8)
         self.pushButton_7.setObjectName("pushButton_7")
+        #设置禁用
+        self.pushButton_7.setEnabled(False)
+        self.pushButton_8.setEnabled(False)
+
         self.horizontalLayout_2.addWidget(self.pushButton_7)
         self.pushButton_6 = QtWidgets.QPushButton(self.horizontalLayoutWidget_2)
         icon9 = QtGui.QIcon()
@@ -255,7 +388,7 @@ class Ui_MainWindow(object):
         self.pushButton_6.setObjectName("pushButton_6")
         self.horizontalLayout_2.addWidget(self.pushButton_6)
         self.layoutWidget = QtWidgets.QWidget(self.frame_3)
-        self.layoutWidget.setGeometry(QtCore.QRect(560, 10, 169, 26))
+        self.layoutWidget.setGeometry(QtCore.QRect(560,6 , 169, 26))
         self.layoutWidget.setObjectName("layoutWidget")
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self.layoutWidget)
         self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
@@ -293,10 +426,10 @@ class Ui_MainWindow(object):
         self.gridLayout.setContentsMargins(0, 0, 0, 0)
         self.gridLayout.setObjectName("gridLayout")
 
-        path = '{0}{1}'.format('E', ':')
+        path = '{0}{1}'.format('C', ':')
         self.getFile(os.listdir(path))
-       #定义定时器
-        self.timer = QtCore.QTimer()
+        self.nextPath=0
+        self.result = []
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
@@ -312,8 +445,8 @@ class Ui_MainWindow(object):
         self.pushButton_3.clicked.connect(self.delete)
         self.pushButton_5.clicked.connect(self.newfile)
         self.pushButton_9.clicked.connect(self.searchfile)
-        self.pushButton_8.clicked.connect(self.forward)
-        self.pushButton_7.clicked.connect(self.back)
+        self.pushButton_8.clicked.connect(self.back)
+        self.pushButton_7.clicked.connect(self.forward)
         self.pushButton_6.clicked.connect(self.refresh)
 
         QtCore.QMetaObject.connectSlotsByName(MainWindow)

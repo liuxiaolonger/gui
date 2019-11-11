@@ -52,7 +52,7 @@
      </property>
      <column>
       <property name="text">
-       <string>bbbb</string>
+       <string/>
       </property>
      </column>
      <item>
@@ -858,6 +858,22 @@
     <hint type="destinationlabel">
      <x>322</x>
      <y>122</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_10</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>MainWindow</receiver>
+   <slot>share()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>238</x>
+     <y>176</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>183</x>
+     <y>403</y>
     </hint>
    </hints>
   </connection>
