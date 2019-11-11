@@ -14,16 +14,17 @@ class fileSearchThread(QThread):
     isAlive=False
     # 自定义信号，执行run()函数时，从相关线程发射此信号
 
-    def __init__(self,key):
+    def __init__(self,key,path):
         super().__init__()
         self.key = key
+        self.path=path
 
     def run(self):
         threads=[]
-        path = [r"c:\\", r"d:\\", r"e:\\", r"f:\\"]
         #通过多线程对windows下的多个盘符进行文件的遍历查找
         pool = ThreadPoolExecutor(max_workers=5)
-        for each in path:
+        list=[self.path]
+        for each in list:
             t = threading.Thread(target=self.search, args=(self.key,each,))
             threads.append(t)
             t.start()

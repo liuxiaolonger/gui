@@ -24,13 +24,13 @@ class Ui_MainWindow(object):
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap("../ioc/rightnot.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.pushButton_7.setIcon(icon)
-
         self.pushButton_8.setEnabled(False)
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap("../ioc/leftnot.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.pushButton_8.setIcon(icon)
 
         self.nextPath=""
+        self.clickSelectList=[]
 
         _translate = QtCore.QCoreApplication.translate
         item = self.treeWidget.currentItem()
@@ -67,15 +67,22 @@ class Ui_MainWindow(object):
         # 创建新线程，将自定义信号sinOut连接到slotAdd()槽函数
         keyword = text
         self.result=[]
-        self.thread=fileSearchThread(keyword)
+        path = self.label_2.text()
+        if ':/' in path:
+            path = path.replace(":/", ":\\\\")
+            path = '{0}{1}'.format(path, "\\")
+        else:
+            path = path.replace(":", ":\\\\")
+        print("最终的查询路径",path)
+        self.thread=fileSearchThread(keyword,path)
         self.thread.sinOut.connect(self.slotAdd)
-
         self.thread.start()
 
     #搜索用的
     def slotAdd(self,filename):
         self.result.append(str(filename))
         self.getFile(self.result)
+        print(self.result)
     def refresh(self,index):
         self.goTop()
         text = self.label_2.text()
@@ -111,6 +118,7 @@ class Ui_MainWindow(object):
 
 
     def forward(self,index):
+        self.clickSelectList = []
         #下一步设计
         _translate = QtCore.QCoreApplication.translate
         self.label_2.setText(_translate("MainWindow", self.nextPath))
@@ -139,6 +147,7 @@ class Ui_MainWindow(object):
                 icount =index
         return icount
     def doDoubleClick(self,index,value):
+        self.clickSelectList = []
         #后退按钮为true,可点击
         self.pushButton_8.setEnabled(True)
         icon= QtGui.QIcon()
@@ -160,10 +169,18 @@ class Ui_MainWindow(object):
         _translate = QtCore.QCoreApplication.translate
         text = self.label_2.text()
         item = self.treeWidget.currentItem()
-        i = '{0}{1}{2}'.format(text, '/', value)
         name='{0}{1}'.format('pushButton_file',index)
+        labelname = '{0}{1}'.format('label_file', index)
         getattr(self, name).setStyleSheet("background-color: rgb(255, 255, 255);")
-
+        if ':' in getattr(self, labelname).text():
+            url=getattr(self, labelname).text()
+            url=url.replace(':\\\\',':\\')
+            self.clickSelectList.append(url)
+        else:
+            url='{0}{1}{2}'.format(text,"\\",getattr(self, labelname).text())
+            url = url.replace('/','\\')
+            self.clickSelectList.append(url)
+        print(self.clickSelectList)
 
     def getFile(self,testList):
         marginLeft = 0
@@ -241,9 +258,7 @@ class Ui_MainWindow(object):
             getattr(self, pushButton).clicked.connect(partial(self.remember,index,value))
             getattr(self, pushButton).doubleClicked.connect(partial(self.doDoubleClick,index,value))
             getattr(self, pushButton)
-
             getattr(self, verticalLayout).addWidget( getattr(self, pushButton))
-
             setattr(self, label, QtWidgets.QLabel(getattr(self, layoutWidget)))
             getattr(self, label).setAlignment(QtCore.Qt.AlignCenter)
             getattr(self, label).setObjectName(label)
@@ -429,7 +444,10 @@ class Ui_MainWindow(object):
         path = '{0}{1}'.format('C', ':')
         self.getFile(os.listdir(path))
         self.nextPath=0
+        #搜索得到的一个结果
         self.result = []
+        #单击选中Click Select
+        self.clickSelectList=[]
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
